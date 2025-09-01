@@ -1,11 +1,20 @@
 import { GoogleGenAI } from "@google/genai";
 import { StockData, GroundingSource, AnalysisReport } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+// Lazily initialize to avoid crashing the app if API_KEY is missing on load.
+// The main App component will handle showing an error message to the user.
+let ai: GoogleGenAI | undefined;
+function getAi() {
+    if (!ai) {
+        if (!process.env.API_KEY) {
+            // This should ideally not be reached if the App.tsx check is in place,
+            // but it's a safeguard.
+            throw new Error("API_KEY environment variable not set");
+        }
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
 }
-  
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 function parseJsonFromMarkdown<T>(text: string): T | null {
     const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
@@ -64,7 +73,7 @@ export const fetchStockData = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
@@ -144,7 +153,7 @@ export const fetchFundamentalAnalysis = async (ticker: string): Promise<Analysis
     `;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {

@@ -18,6 +18,24 @@ import AllTransactionsHistory from './components/AllTransactionsHistory';
 import { BrainIcon } from './components/icons/BrainIcon';
 
 const App: React.FC = () => {
+  // Environment variable check to prevent a blank page on deployment
+  if (!process.env.API_KEY || process.env.API_KEY.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-200 flex flex-col justify-center items-center p-4">
+        <div className="bg-red-900/30 border border-red-500 text-red-300 p-8 rounded-lg max-w-2xl text-center shadow-2xl">
+            <h1 className="text-3xl font-bold text-white mb-4">Application Configuration Error</h1>
+            <p className="text-lg mb-2 text-gray-300">The application cannot start because it's missing a required configuration.</p>
+            <p className="text-gray-400">
+                The <code className="bg-gray-800 border border-gray-600 px-2 py-1 rounded-md font-mono text-white">API_KEY</code> environment variable has not been set. The application cannot connect to the backend AI service without it.
+            </p>
+            <p className="text-gray-400 mt-4">
+                <strong>Action Required:</strong> If you are the developer or administrator, please add your Google Gemini API key to your deployment platform's environment variables (e.g., Vercel, Netlify) and redeploy the application.
+            </p>
+        </div>
+      </div>
+    );
+  }
+
   const { portfolio, addHoldings, sellHolding, updateHolding, addDividend, clearPortfolio, addPortfolioSnapshot } = usePortfolio();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [transactionModalState, setTransactionModalState] = useState<{isOpen: boolean; holding: PortfolioHolding | null}>({isOpen: false, holding: null});
