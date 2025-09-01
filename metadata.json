@@ -1,0 +1,5 @@
+{
+  "name": "PSX Portfolio Tracker",
+  "description": "A complete portfolio tracker for the Pakistan Stock Exchange (PSX) to manage holdings, track performance, and fetch live market data.",
+  "requestFramePermissions": []
+}
