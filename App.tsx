@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { PortfolioHolding, TransactionPayload, AnalysisReport, StockData } from './types';
 import { usePortfolio } from './hooks/usePortfolio';
 import { fetchStockData as fetchStockDataWithAI, fetchFundamentalAnalysis } from './services/geminiService';
@@ -16,24 +16,19 @@ import { RefreshIcon } from './components/icons/RefreshIcon';
 import AnalysisModal from './components/AnalysisModal';
 import AllTransactionsHistory from './components/AllTransactionsHistory';
 import { BrainIcon } from './components/icons/BrainIcon';
+import * as apiKeyService from './services/apiKeyService';
+import ApiSetup from './components/ApiSetup';
+import ApiKeyManagerModal from './components/ApiKeyManagerModal';
+import { SettingsIcon } from './components/icons/SettingsIcon';
+
 
 const App: React.FC = () => {
-  // Environment variable check to prevent a blank page on deployment
-  if (!process.env.API_KEY || process.env.API_KEY.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-gray-200 flex flex-col justify-center items-center p-4">
-        <div className="bg-red-900/30 border border-red-500 text-red-300 p-8 rounded-lg max-w-2xl text-center shadow-2xl">
-            <h1 className="text-3xl font-bold text-white mb-4">Application Configuration Error</h1>
-            <p className="text-lg mb-2 text-gray-300">The application cannot start because it's missing a required configuration.</p>
-            <p className="text-gray-400">
-                The <code className="bg-gray-800 border border-gray-600 px-2 py-1 rounded-md font-mono text-white">API_KEY</code> environment variable has not been set. The application cannot connect to the backend AI service without it.
-            </p>
-            <p className="text-gray-400 mt-4">
-                <strong>Action Required:</strong> If you are the developer or administrator, please add your Google Gemini API key to your deployment platform's environment variables (e.g., Vercel, Netlify) and redeploy the application.
-            </p>
-        </div>
-      </div>
-    );
+  const [apiKeys, setApiKeys] = useState<string[]>(apiKeyService.getApiKeys());
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+
+  // If no API key is set, render the setup screen.
+  if (apiKeys.length === 0) {
+    return <ApiSetup onKeysSaved={() => setApiKeys(apiKeyService.getApiKeys())} />;
   }
 
   const { portfolio, addHoldings, sellHolding, updateHolding, addDividend, clearPortfolio, addPortfolioSnapshot } = usePortfolio();
@@ -228,9 +223,13 @@ const App: React.FC = () => {
     for (const [index, ticker] of tickersToAnalyze.entries()) {
         setAnalysisProgress({ current: index + 1, total: tickersToAnalyze.length });
         try {
-            await handleAnalyzeStock(ticker);
-            // Close the modal immediately to proceed to the next one
-            handleCloseAnalysisModal(); 
+            // Re-use the handleAnalyzeStock logic which includes caching
+            const report = await fetchFundamentalAnalysis(ticker);
+             const newCacheItem = {
+                timestamp: new Date().getTime(),
+                report,
+            };
+            localStorage.setItem(`analysis_${ticker}`, JSON.stringify(newCacheItem));
         } catch (e) {
             console.error(`Failed to analyze ${ticker}`, e);
             // Continue to the next one even if one fails
@@ -238,7 +237,7 @@ const App: React.FC = () => {
     }
 
     setIsAnalyzingAll(false);
-  }, [portfolio.holdings, handleAnalyzeStock]);
+  }, [portfolio.holdings]);
 
 
   const handleCloseAnalysisModal = () => {
@@ -299,7 +298,7 @@ const App: React.FC = () => {
     [portfolio.holdings, numericManualPrices]
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if(!isLoading && portfolio.lastRefreshed) {
         const today = new Date().toISOString().split('T')[0];
         const lastSnapshotDate = portfolio.history.length > 0 ? portfolio.history[portfolio.history.length - 1].date.split('T')[0] : null;
@@ -324,14 +323,24 @@ const App: React.FC = () => {
             <h1 className="text-4xl font-bold text-white mb-1">PSX Portfolio Tracker</h1>
             <p className="text-lg text-gray-400">Your personal dashboard for PSX investments.</p>
           </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-500 transition-colors mt-4 sm:mt-0"
-            aria-label="Add new stock holdings"
-          >
-            <PlusIcon />
-            Add Holdings
-          </button>
+          <div className="flex items-center gap-4 mt-4 sm:mt-0">
+            <button
+              onClick={() => setIsApiKeyModalOpen(true)}
+              className="p-2 text-gray-400 hover:text-white transition-colors"
+              aria-label="Manage API Keys"
+              title="Manage API Keys"
+            >
+              <SettingsIcon />
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-500 transition-colors"
+              aria-label="Add new stock holdings"
+            >
+              <PlusIcon />
+              Add Holdings
+            </button>
+          </div>
         </header>
         
         <main>
@@ -466,6 +475,14 @@ const App: React.FC = () => {
             report={analysisModalState.report}
             isLoading={analysisModalState.isLoading}
             error={analysisModalState.error}
+        />
+      )}
+
+      {isApiKeyModalOpen && (
+        <ApiKeyManagerModal
+          isOpen={isApiKeyModalOpen}
+          onClose={() => setIsApiKeyModalOpen(false)}
+          onKeysUpdated={() => setApiKeys(apiKeyService.getApiKeys())}
         />
       )}
     </div>

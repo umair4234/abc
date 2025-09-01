@@ -1,20 +1,60 @@
 import { GoogleGenAI } from "@google/genai";
 import { StockData, GroundingSource, AnalysisReport } from '../types';
+import * as apiKeyService from './apiKeyService';
 
-// Lazily initialize to avoid crashing the app if API_KEY is missing on load.
-// The main App component will handle showing an error message to the user.
-let ai: GoogleGenAI | undefined;
-function getAi() {
-    if (!ai) {
-        if (!process.env.API_KEY) {
-            // This should ideally not be reached if the App.tsx check is in place,
-            // but it's a safeguard.
-            throw new Error("API_KEY environment variable not set");
-        }
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Store initialized AI clients to avoid re-creating them for each call
+const aiClients = new Map<string, GoogleGenAI>();
+
+async function getAiClientWithRetry<T>(
+    apiCall: (client: GoogleGenAI) => Promise<T>
+): Promise<T> {
+    const initialKeyIndex = apiKeyService.getActiveKeyIndex();
+    let attempts = 0;
+    const totalKeys = apiKeyService.getApiKeys().length;
+
+    if (totalKeys === 0) {
+        throw new Error("No API keys configured. Please add an API key in the settings.");
     }
-    return ai;
+
+    while (attempts < totalKeys) {
+        const activeKey = apiKeyService.getActiveApiKey();
+        if (!activeKey) {
+            // This should not happen if totalKeys > 0, but as a safeguard:
+            throw new Error("Could not retrieve an active API key.");
+        }
+
+        let client = aiClients.get(activeKey);
+        if (!client) {
+            client = new GoogleGenAI({ apiKey: activeKey });
+            aiClients.set(activeKey, client);
+        }
+
+        try {
+            // Attempt the API call with the current client
+            return await apiCall(client);
+        } catch (error: any) {
+            console.warn(`API call failed with key ending in ...${activeKey.slice(-4)}`, error.message);
+            // Check for rate limit / quota error (429 is the typical status code)
+            const isQuotaError = error.message.includes('429') || error.message.toLowerCase().includes('quota');
+            
+            if (isQuotaError && attempts < totalKeys - 1) {
+                console.log("Quota error detected. Switching to the next API key.");
+                apiKeyService.switchToNextKey();
+                attempts++;
+            } else {
+                // If it's not a quota error or we've tried all keys, throw the error
+                // Reset to the initial key to not penalize the next independent operation
+                apiKeyService.setActiveKeyIndex(initialKeyIndex); 
+                throw error;
+            }
+        }
+    }
+    
+    // This part should be unreachable if logic is correct, but as a fallback
+    apiKeyService.setActiveKeyIndex(initialKeyIndex); 
+    throw new Error("All API keys failed due to quota limits. Please try again later or add a new key.");
 }
+
 
 function parseJsonFromMarkdown<T>(text: string): T | null {
     const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
@@ -73,7 +113,7 @@ export const fetchStockData = async (
   `;
 
   try {
-    const response = await getAi().models.generateContent({
+    const apiCall = (client: GoogleGenAI) => client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
@@ -81,6 +121,8 @@ export const fetchStockData = async (
         temperature: 0,
       },
     });
+
+    const response = await getAiClientWithRetry(apiCall);
 
     const stockData = parseJsonFromMarkdown<StockData[]>(response.text);
     
@@ -153,7 +195,7 @@ export const fetchFundamentalAnalysis = async (ticker: string): Promise<Analysis
     `;
 
     try {
-        const response = await getAi().models.generateContent({
+        const apiCall = (client: GoogleGenAI) => client.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -162,6 +204,8 @@ export const fetchFundamentalAnalysis = async (ticker: string): Promise<Analysis
                 temperature: 0.2,
             },
         });
+
+        const response = await getAiClientWithRetry(apiCall);
         
         const report = parseJsonFromMarkdown<AnalysisReport>(response.text);
         if(report) {
