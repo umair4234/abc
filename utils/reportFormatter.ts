@@ -15,6 +15,14 @@ const formatNumber = (value: number | null | undefined, suffix: string = '', dig
     return `${value.toFixed(digits)}${suffix}`;
 }
 
+const getRiskColor = (impact: 'High' | 'Medium' | 'Low') => {
+    switch(impact) {
+        case 'High': return 'border-red-500 bg-red-900/30';
+        case 'Medium': return 'border-yellow-500 bg-yellow-900/30';
+        case 'Low': return 'border-gray-600 bg-gray-800/50';
+    }
+}
+
 export const generateReportHtml = (report: AnalysisReport): string => {
   return `
     <!DOCTYPE html>
@@ -34,6 +42,7 @@ export const generateReportHtml = (report: AnalysisReport): string => {
             h1, h2, h3 { color: #ffffff; font-weight: bold; }
             h1 { font-size: 2.25rem; line-height: 2.5rem; margin-bottom: 0.5rem; }
             h2 { font-size: 1.5rem; line-height: 2rem; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid #374151; padding-bottom: 0.5rem; }
+            h3 { font-size: 1.25rem; line-height: 1.75rem; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #9ca3af; }
             p { margin-bottom: 1rem; line-height: 1.6; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
             th, td { text-align: left; padding: 0.75rem; border: 1px solid #374151; }
@@ -81,18 +90,29 @@ export const generateReportHtml = (report: AnalysisReport): string => {
             <h2>Key Metrics</h2>
             <table>
                 <thead>
-                    <tr><th>Metric</th><th>Value</th><th>Peer Median</th><th>Source</th></tr>
+                    <tr><th>Metric</th><th>Value</th><th>Peer Median</th><th>Peer Comparison</th></tr>
                 </thead>
                 <tbody>
-                    <tr><td>P/E (TTM)</td><td>${formatNumber(report.key_metrics.PE_TTM.value)}</td><td>${formatNumber(report.key_metrics.PE_TTM.peer_median)}</td><td><a href="${report.key_metrics.PE_TTM.source}" class="text-blue-400">Link</a></td></tr>
-                    <tr><td>Price to Book (P/B)</td><td>${formatNumber(report.key_metrics.P_B.value)}</td><td>${formatNumber(report.key_metrics.P_B.peer_median)}</td><td><a href="${report.key_metrics.P_B.source}" class="text-blue-400">Link</a></td></tr>
-                    <tr><td>Return on Equity (ROE TTM)</td><td>${formatNumber(report.key_metrics.ROE_TTM.value, '%')}</td><td>${formatNumber(report.key_metrics.ROE_TTM.peer_median, '%')}</td><td><a href="${report.key_metrics.ROE_TTM.source}" class="text-blue-400">Link</a></td></tr>
-                    <tr><td>Market Cap (PKR)</td><td colspan="2">${formatCurrency(report.market_cap.pkr)}</td><td><a href="${report.last_price.source}" class="text-blue-400">Link</a></td></tr>
+                    <tr><td>P/E (TTM)</td><td>${formatNumber(report.key_metrics.PE_TTM.value)}</td><td>${formatNumber(report.key_metrics.PE_TTM.peer_median)}</td><td>${report.key_metrics.PE_TTM.peer_comparison_text || 'N/A'}</td></tr>
+                    <tr><td>Price to Book (P/B)</td><td>${formatNumber(report.key_metrics.P_B.value)}</td><td>${formatNumber(report.key_metrics.P_B.peer_median)}</td><td>${report.key_metrics.P_B.peer_comparison_text || 'N/A'}</td></tr>
+                    <tr><td>Return on Equity (ROE TTM)</td><td>${formatNumber(report.key_metrics.ROE_TTM.value, '%')}</td><td>${formatNumber(report.key_metrics.ROE_TTM.peer_median, '%')}</td><td>${report.key_metrics.ROE_TTM.peer_comparison_text || 'N/A'}</td></tr>
+                    <tr><td>Dividend Yield (TTM)</td><td>${formatNumber(report.key_metrics.Dividend_Yield_TTM.value, '%')}</td><td>${formatNumber(report.key_metrics.Dividend_Yield_TTM.peer_median, '%')}</td><td>${report.key_metrics.Dividend_Yield_TTM.peer_comparison_text || 'N/A'}</td></tr>
+                    <tr><td>Market Cap (PKR)</td><td colspan="2">${formatCurrency(report.market_cap.pkr)}</td><td>-</td></tr>
                 </tbody>
             </table>
 
+            <h2>Weighted Risks</h2>
+            <div class="space-y-3">
+                ${report.weighted_risks.map(risk => `
+                    <div class="border-l-4 p-4 rounded-r-lg ${getRiskColor(risk.impact)}">
+                        <strong class="font-bold text-white">${risk.impact} Impact:</strong>
+                        <span class="text-gray-300">${risk.description}</span>
+                    </div>
+                `).join('')}
+            </div>
+
             <h2>Analysis Score Breakdown</h2>
-            <div class="space-y-4">
+            <div class="space-y-4 my-6">
                 ${Object.entries(report.score).filter(([key]) => key !== 'overall_score').map(([key, value]) => `
                     <div>
                         <div class="flex justify-between mb-1">
@@ -107,18 +127,31 @@ export const generateReportHtml = (report: AnalysisReport): string => {
             </div>
 
             <h2>Detailed Analysis</h2>
-            <h3>Financial Health</h3>
-            <p>${report.financial_health_details || 'Not available.'}</p>
-            <h3>Profitability</h3>
-            <p>${report.profitability_details || 'Not available.'}</p>
-            <h3>Growth</h3>
-            <p>${report.growth_details || 'Not available.'}</p>
-            <h3>Valuation</h3>
-            <p>${report.valuation_details || 'Not available.'}</p>
-            <h3>Governance & News</h3>
-            <p>${report.governance_details || 'Not available.'}</p>
-            <h3>Macro & Industry Factors</h3>
-            <p>${report.macro_industry_factors || 'Not available.'}</p>
+            <h3>Financial Health</h3><p>${report.financial_health_details || 'Not available.'}</p>
+            <h3>Profitability</h3><p>${report.profitability_details || 'Not available.'}</p>
+            <h3>Growth</h3><p>${report.growth_details || 'Not available.'}</p>
+            <h3>Valuation</h3><p>${report.valuation_details || 'Not available.'}</p>
+            <h3>Cash Flow</h3><p>${report.cash_flow_details || 'Not available.'}</p>
+            <h3>Historical Valuation</h3><p>${report.historical_valuation_details || 'Not available.'}</p>
+            <h3>Forward Guidance</h3><p>${report.forward_guidance_details || 'Not available.'}</p>
+            <h3>Governance & News</h3><p>${report.governance_details || 'Not available.'}</p>
+            <h3>Macro & Industry Factors</h3><p>${report.macro_industry_factors || 'Not available.'}</p>
+            
+            ${report.visual_data_summary ? `
+            <h2>Visual Data Summary</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="metric-card"><h3>Profit Trend</h3><p class="text-gray-300">${report.visual_data_summary.profit_trend_comment}</p></div>
+                <div class="metric-card"><h3>ROE vs Peers</h3><p class="text-gray-300">${report.visual_data_summary.roe_vs_peers_comment}</p></div>
+                <div class="metric-card"><h3>Dividend History</h3><p class="text-gray-300">${report.visual_data_summary.dividend_history_comment}</p></div>
+            </div>
+            ` : ''}
+            
+            ${report.extra_sections ? `
+            <h2>Extra Sections</h2>
+            ${report.extra_sections.esg_governance ? `<h3>ESG & Governance</h3><p>${report.extra_sections.esg_governance}</p>` : ''}
+            ${report.extra_sections.stress_test ? `<h3>Stress Test Scenario</h3><p>${report.extra_sections.stress_test}</p>` : ''}
+            ${report.extra_sections.action_plan ? `<h3>Action Plan</h3><p>${report.extra_sections.action_plan}</p>` : ''}
+            ` : ''}
 
             <h2>Sources</h2>
             <ul class="list-disc list-inside text-sm">

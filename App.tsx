@@ -15,6 +15,7 @@ import { PlusIcon } from './components/icons/PlusIcon';
 import { RefreshIcon } from './components/icons/RefreshIcon';
 import AnalysisModal from './components/AnalysisModal';
 import AllTransactionsHistory from './components/AllTransactionsHistory';
+import { BrainIcon } from './components/icons/BrainIcon';
 
 const App: React.FC = () => {
   const { portfolio, addHoldings, sellHolding, updateHolding, addDividend, clearPortfolio, addPortfolioSnapshot } = usePortfolio();
@@ -33,12 +34,16 @@ const App: React.FC = () => {
     isLoading: boolean;
     error: string | null;
   }>({ isOpen: false, ticker: null, report: null, isLoading: false, error: null });
+  
+  // State for Analyze All
+  const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState({current: 0, total: 0});
+
 
   // State for scrape/fallback mechanism
   const [scrapeFailedTickers, setScrapeFailedTickers] = useState<string[]>([]);
 
-  const updateHoldingsWithNewData = useCallback((data: StockData[]) => {
-      // FIX: Add an explicit return type to the map callback to ensure the type guard in the filter is valid.
+  const updateHoldingsWithNewData = useCallback((data: StockData[], dataSource: 'scraper' | 'ai') => {
       const updatedHoldings = data.map((liveData): PortfolioHolding | null => {
         const existingHolding = portfolio.holdings.find(h => h.ticker === liveData.ticker);
         if (!existingHolding) return null;
@@ -49,6 +54,7 @@ const App: React.FC = () => {
           dayChangeValue: liveData.change,
           sector: liveData.sector || existingHolding.sector,
           overview: liveData.overview || existingHolding.overview,
+          dataSource: dataSource,
         };
       }).filter((h): h is PortfolioHolding => h !== null);
 
@@ -100,7 +106,7 @@ const App: React.FC = () => {
       });
       
       if(successfulData.length > 0) {
-        updateHoldingsWithNewData(successfulData);
+        updateHoldingsWithNewData(successfulData, 'scraper');
       }
       if(failed.length > 0) {
         setScrapeFailedTickers(failed);
@@ -119,7 +125,7 @@ const App: React.FC = () => {
       try {
           const result = await fetchStockDataWithAI(tickers);
           if (result && result.stockData.length > 0) {
-              updateHoldingsWithNewData(result.stockData);
+              updateHoldingsWithNewData(result.stockData, 'ai');
               // If this was a fallback, clear the failed tickers list
               if (isFallback) {
                 setScrapeFailedTickers([]);
@@ -193,6 +199,29 @@ const App: React.FC = () => {
         setAnalysisModalState({ isOpen: true, ticker, report: null, isLoading: false, error: errorMessage });
     }
   }, []);
+  
+  const handleAnalyzeAll = useCallback(async () => {
+    const tickersToAnalyze = portfolio.holdings.map(h => h.ticker);
+    if(tickersToAnalyze.length === 0) return;
+    
+    setIsAnalyzingAll(true);
+    setAnalysisProgress({ current: 0, total: tickersToAnalyze.length });
+
+    for (const [index, ticker] of tickersToAnalyze.entries()) {
+        setAnalysisProgress({ current: index + 1, total: tickersToAnalyze.length });
+        try {
+            await handleAnalyzeStock(ticker);
+            // Close the modal immediately to proceed to the next one
+            handleCloseAnalysisModal(); 
+        } catch (e) {
+            console.error(`Failed to analyze ${ticker}`, e);
+            // Continue to the next one even if one fails
+        }
+    }
+
+    setIsAnalyzingAll(false);
+  }, [portfolio.holdings, handleAnalyzeStock]);
+
 
   const handleCloseAnalysisModal = () => {
     setAnalysisModalState({ isOpen: false, ticker: null, report: null, isLoading: false, error: null });
@@ -312,20 +341,41 @@ const App: React.FC = () => {
                 <div className="lg:col-span-2">
                    <div className="flex justify-between items-center mb-4">
                      <h2 className="text-2xl font-bold text-white">Your Holdings</h2>
-                     {missingDataTickers.length > 0 && (
-                        <button 
-                            onClick={handleRefreshMissing}
-                            disabled={isRefreshingMissing}
-                            className="flex items-center gap-2 text-sm bg-yellow-600/20 text-yellow-300 font-semibold py-2 px-3 rounded-md hover:bg-yellow-600/40 disabled:opacity-50 transition-colors"
+                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleAnalyzeAll}
+                            disabled={isAnalyzingAll}
+                            className="flex items-center gap-2 text-sm bg-purple-800/50 text-purple-300 font-semibold py-2 px-3 rounded-md hover:bg-purple-700/50 disabled:opacity-50 transition-colors"
+                            title="Run AI analysis on all holdings"
                         >
-                             {isRefreshingMissing ? (
-                                <div className="animate-spin"><RefreshIcon /></div>
+                            {isAnalyzingAll ? (
+                                <>
+                                 <div className="animate-spin"><BrainIcon /></div>
+                                 <span>Analyzing... ({analysisProgress.current}/{analysisProgress.total})</span>
+                                </>
                             ) : (
-                                <RefreshIcon />
+                                <>
+                                 <BrainIcon />
+                                 <span>Analyze All</span>
+                                </>
                             )}
-                            Refresh {missingDataTickers.length} Missing
                         </button>
-                     )}
+
+                        {missingDataTickers.length > 0 && (
+                            <button 
+                                onClick={handleRefreshMissing}
+                                disabled={isRefreshingMissing}
+                                className="flex items-center gap-2 text-sm bg-yellow-600/20 text-yellow-300 font-semibold py-2 px-3 rounded-md hover:bg-yellow-600/40 disabled:opacity-50 transition-colors"
+                            >
+                                {isRefreshingMissing ? (
+                                    <div className="animate-spin"><RefreshIcon /></div>
+                                ) : (
+                                    <RefreshIcon />
+                                )}
+                                Refresh {missingDataTickers.length} Missing
+                            </button>
+                        )}
+                     </div>
                    </div>
                    <PortfolioTable 
                     holdings={portfolio.holdings} 

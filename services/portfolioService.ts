@@ -87,6 +87,8 @@ export const addHoldings = (
           existing.dayChangeValue = newHolding.dayChangeValue;
           existing.companyName = newHolding.companyName || existing.companyName;
           existing.sector = newHolding.sector || existing.sector;
+          existing.overview = newHolding.overview || existing.overview;
+          existing.dataSource = newHolding.dataSource; // Persist the data source
         } else {
           // This is adding more shares, merge transactions and recalculate
           existing.transactions = [...existing.transactions, ...newHolding.transactions];

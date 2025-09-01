@@ -54,6 +54,7 @@ export interface PortfolioHolding {
   currentPrice?: number;
   dayChangeValue?: number; // Price change for the day per share
   overview?: OverviewData;
+  dataSource?: 'scraper' | 'ai' | 'manual';
 }
 
 export interface PortfolioSnapshot {
@@ -103,6 +104,8 @@ interface ReportMetric {
     source?: string;
     peer_median?: number;
     percentile?: number;
+    trend?: 'up' | 'down' | 'flat';
+    peer_comparison_text?: string;
 }
 
 interface MarketCap {
@@ -129,6 +132,12 @@ interface Recommendation {
     action: 'Strong BUY' | 'BUY' | 'HOLD' | 'REDUCE / WEAK SELL' | 'SELL' | string;
     confidence_pct: number;
     rationale_short: string;
+    confidence_rationale?: string;
+}
+
+interface WeightedRisk {
+    description: string;
+    impact: 'High' | 'Medium' | 'Low';
 }
 
 interface RawSource {
@@ -152,18 +161,16 @@ export interface AnalysisReport {
         PE_TTM: ReportMetric;
         P_B: ReportMetric;
         ROE_TTM: ReportMetric;
+        Dividend_Yield_TTM: ReportMetric;
         Revenue_TTM: ReportMetric;
         Net_Income_TTM: ReportMetric;
-        Free_Cash_Flow: ReportMetric;
         [key: string]: ReportMetric;
     };
     score: Score;
     recommendation: Recommendation;
     top_reasons_buy: string[];
-    top_risks: string[];
-    detailed_report_url?: string;
+    weighted_risks: WeightedRisk[];
     raw_sources: RawSource[];
-    // Add full report details
     executive_summary?: string;
     financial_health_details?: string;
     profitability_details?: string;
@@ -171,4 +178,17 @@ export interface AnalysisReport {
     valuation_details?: string;
     governance_details?: string;
     macro_industry_factors?: string;
+    cash_flow_details?: string;
+    historical_valuation_details?: string;
+    forward_guidance_details?: string;
+    visual_data_summary?: {
+        profit_trend_comment: string;
+        roe_vs_peers_comment: string;
+        dividend_history_comment: string;
+    };
+    extra_sections?: {
+        esg_governance?: string;
+        stress_test?: string;
+        action_plan?: string;
+    };
 }

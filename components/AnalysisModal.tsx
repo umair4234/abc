@@ -4,6 +4,8 @@ import { CloseIcon } from './icons/CloseIcon';
 import Loader from './Loader';
 import ErrorMessage from './ErrorMessage';
 import { generateReportHtml } from '../utils/reportFormatter';
+import { TrendUpIcon } from './icons/TrendUpIcon';
+import { TrendDownIcon } from './icons/TrendDownIcon';
 
 interface AnalysisModalProps {
   isOpen: boolean;
@@ -22,18 +24,39 @@ const getRecommendationClass = (action: string) => {
     return 'text-gray-400';
 }
 
-const Metric: React.FC<{label: string, value: string | number | null | undefined, peer?: string | number | null}> = ({ label, value, peer }) => (
+const TrendIcon: React.FC<{trend?: 'up' | 'down' | 'flat'}> = ({ trend }) => {
+    if (trend === 'up') return <TrendUpIcon className="w-4 h-4 text-green-500" />;
+    if (trend === 'down') return <TrendDownIcon className="w-4 h-4 text-red-500" />;
+    return null;
+}
+
+const Metric: React.FC<{
+    label: string, 
+    value: string | number | null | undefined, 
+    trend?: 'up' | 'down' | 'flat',
+    comparison?: string | null
+}> = ({ label, value, trend, comparison }) => (
     <div className="bg-gray-800/50 p-3 rounded-lg text-center">
         <p className="text-xs text-gray-400 mb-1">{label}</p>
-        <p className="text-lg font-semibold text-white">{value ?? 'N/A'}</p>
-        {peer && <p className="text-xs text-gray-500">Peer: {peer}</p>}
+        <div className="flex items-center justify-center gap-1">
+            <p className="text-lg font-semibold text-white">{value ?? 'N/A'}</p>
+            <TrendIcon trend={trend} />
+        </div>
+        {comparison && <p className="text-xs text-gray-500 truncate" title={comparison}>{comparison}</p>}
     </div>
 );
 
-const ReasonPill: React.FC<{ children: React.ReactNode, type: 'buy' | 'risk'}> = ({ children, type }) => {
-    const baseClass = "px-3 py-1 text-xs font-medium rounded-full";
-    const typeClass = type === 'buy' ? "bg-green-900/50 text-green-300" : "bg-red-900/50 text-red-300";
-    return <span className={`${baseClass} ${typeClass}`}>{children}</span>
+const ReasonPill: React.FC<{ children: React.ReactNode, type: 'buy' | 'risk', impact?: 'High' | 'Medium' | 'Low'}> = ({ children, type, impact }) => {
+    const baseClass = "px-3 py-1 text-xs font-medium rounded-full inline-block";
+    let typeClass = "bg-gray-700 text-gray-300";
+    if(type === 'buy') {
+        typeClass = "bg-green-900/50 text-green-300";
+    } else if (type === 'risk' && impact) {
+        if(impact === 'High') typeClass = "bg-red-900/50 text-red-300";
+        if(impact === 'Medium') typeClass = "bg-yellow-900/50 text-yellow-300";
+        if(impact === 'Low') typeClass = "bg-gray-800 border border-gray-600 text-gray-400";
+    }
+    return <span className={`${baseClass} ${typeClass}`}>{impact && `[${impact}] `}{children}</span>
 }
 
 const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, ticker, report, isLoading, error }) => {
@@ -65,7 +88,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, ticker, 
     }
 
     if (report) {
-      const { recommendation, score, key_metrics, top_reasons_buy, top_risks } = report;
+      const { recommendation, score, key_metrics, top_reasons_buy, weighted_risks } = report;
       return (
          <div className="animate-fade-in">
             <div className="text-center p-4 bg-gray-800 rounded-lg border border-gray-700">
@@ -78,13 +101,15 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, ticker, 
                     <span className="mx-2">|</span>
                     Confidence: <span className="font-semibold text-white">{recommendation.confidence_pct}%</span>
                 </p>
+                 {recommendation.confidence_rationale && <p className="text-xs text-gray-500 mt-2 italic">"{recommendation.confidence_rationale}"</p>}
                 <p className="text-xs text-gray-300 mt-3">{recommendation.rationale_short}</p>
             </div>
             
-            <div className="grid grid-cols-3 gap-3 my-4">
-                <Metric label="P/E (TTM)" value={key_metrics.PE_TTM?.value?.toFixed(2)} peer={key_metrics.PE_TTM?.peer_median?.toFixed(2)} />
-                <Metric label="P/B" value={key_metrics.P_B?.value?.toFixed(2)} peer={key_metrics.P_B?.peer_median?.toFixed(2)} />
-                <Metric label="ROE (TTM)" value={key_metrics.ROE_TTM?.value ? `${key_metrics.ROE_TTM.value.toFixed(2)}%` : null} peer={key_metrics.ROE_TTM?.peer_median ? `${key_metrics.ROE_TTM.peer_median.toFixed(2)}%` : null} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-4">
+                <Metric label="P/E (TTM)" value={key_metrics.PE_TTM?.value?.toFixed(2)} trend={key_metrics.PE_TTM?.trend} comparison={key_metrics.PE_TTM.peer_comparison_text} />
+                <Metric label="P/B" value={key_metrics.P_B?.value?.toFixed(2)} trend={key_metrics.P_B?.trend} comparison={key_metrics.P_B.peer_comparison_text} />
+                <Metric label="ROE (TTM)" value={key_metrics.ROE_TTM?.value ? `${key_metrics.ROE_TTM.value.toFixed(2)}%` : null} trend={key_metrics.ROE_TTM?.trend} comparison={key_metrics.ROE_TTM.peer_comparison_text} />
+                <Metric label="Div. Yield" value={key_metrics.Dividend_Yield_TTM?.value ? `${key_metrics.Dividend_Yield_TTM.value.toFixed(2)}%` : null} trend={key_metrics.Dividend_Yield_TTM?.trend} comparison={key_metrics.Dividend_Yield_TTM.peer_comparison_text} />
             </div>
 
             <div className="space-y-3">
@@ -95,9 +120,9 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, ticker, 
                     </div>
                 </div>
                  <div>
-                    <h4 className="text-sm font-semibold text-gray-300 mb-2">Top Risks</h4>
+                    <h4 className="text-sm font-semibold text-gray-300 mb-2">Weighted Risks</h4>
                     <div className="flex flex-wrap gap-2">
-                        {top_risks.map(r => <ReasonPill key={r} type="risk">{r}</ReasonPill>)}
+                        {weighted_risks.map(r => <ReasonPill key={r.description} type="risk" impact={r.impact}>{r.description}</ReasonPill>)}
                     </div>
                 </div>
             </div>

@@ -3,6 +3,7 @@ import { PortfolioHolding } from '../types';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { BrainIcon } from './icons/BrainIcon';
 import StockDetails from './StockDetails';
+import { LightningIcon } from './icons/LightningIcon';
 
 interface PortfolioTableProps {
   holdings: PortfolioHolding[];
@@ -116,10 +117,14 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings, onTransactCli
                     <TableCell>{formatNumber(holding.quantity)}</TableCell>
                     <TableCell>{formatCurrency(holding.averageBuyPrice)}</TableCell>
                     <TableCell>
-                        {holding.currentPrice !== undefined ? 
-                            formatCurrency(holding.currentPrice) : 
-                            <ManualPriceInput ticker={holding.ticker} value={manualPrices[holding.ticker] || ''} onChange={onManualPriceChange} />
-                        }
+                        <div className="flex items-center justify-end gap-2">
+                             {holding.currentPrice !== undefined ? 
+                                formatCurrency(holding.currentPrice) : 
+                                <ManualPriceInput ticker={holding.ticker} value={manualPrices[holding.ticker] || ''} onChange={onManualPriceChange} />
+                            }
+                            {holding.dataSource === 'scraper' && <span title="Source: Scraper (Fast)" className="text-yellow-400"><LightningIcon /></span>}
+                            {holding.dataSource === 'ai' && <span title="Source: AI Fallback" className="text-purple-400"><BrainIcon /></span>}
+                        </div>
                     </TableCell>
                     <TableCell>{formatCurrency(currentValue, 0)}</TableCell>
                     <TableCell className="hidden md:table-cell">
@@ -159,7 +164,11 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings, onTransactCli
                 {isExpanded && (
                     <tr className="bg-gray-900/50">
                         <td colSpan={9}>
-                           <StockDetails overview={holding.overview} />
+                           <StockDetails 
+                            overview={holding.overview} 
+                            ticker={holding.ticker}
+                            onAnalyzeClick={() => onAnalyzeClick(holding.ticker)}
+                           />
                         </td>
                     </tr>
                 )}

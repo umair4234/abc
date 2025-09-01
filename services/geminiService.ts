@@ -90,44 +90,56 @@ export const fetchStockData = async (
 };
 
 export const fetchFundamentalAnalysis = async (ticker: string): Promise<AnalysisReport> => {
-    const systemInstruction = `You are a deep-research financial analyst. You will research and produce a fact-checked, source-cited fundamental analysis report for a single Pakistani company listed on PSX. Use the latest official and reliable sources. Always show the date of the data you used (AS_OF_DATE) and include direct source links next to numbers. Use very simple English. Do not give legal/financial advice; give informational analysis only and show assumptions. For every numeric claim include a URL and the exact date of the document. If data is missing, say "DATA NOT FOUND". Your final response MUST be a single JSON object that strictly adheres to the provided schema.`;
+    const systemInstruction = `You are a world-class senior financial analyst specializing in the Pakistan Stock Exchange (PSX). Your task is to produce a deep, fact-checked, and source-cited fundamental analysis report for a single company. Use the latest available official financial reports and reliable market data. Always cite the exact date of the data used (AS_OF_DATE) and include direct source URLs for every numerical claim. Use simple, clear English. You are providing informational analysis only, not financial advice. If data is missing for a specific field, explicitly state "DATA NOT FOUND". Your final response MUST be a single, valid JSON object that strictly adheres to the provided schema.`;
 
     const prompt = `
-    Please run a DETAILED report for TICKER=${ticker}, EXCHANGE=PSX. 
-    Use latest data and sources. 
-    Produce a full report as described in the system instructions. 
-    Include score breakdown and all detailed text sections (executive_summary, financial_health_details, etc.).
+    Please conduct a DETAILED fundamental analysis report for TICKER=${ticker}, EXCHANGE=PSX.
+    Use the latest available data and sources.
+    Produce a full report as described in the system instructions.
+    Ensure all fields in the JSON schema are populated, especially the new detailed sections.
 
     Your entire response MUST be a single, valid JSON object inside a JSON markdown block.
     The JSON object MUST conform exactly to this structure:
     {
       "ticker": "string",
       "company_name": "string",
-      "as_of_date": "string",
-      "last_price": { "value": "number", "currency": "string", "date": "string", "source": "string" },
-      "market_cap": { "pkr": "number", "usd": "number", "fx_used": { "rate": "number", "date": "string", "source": "string" } },
+      "as_of_date": "string (date of data)",
+      "last_price": { "value": "number", "currency": "string", "date": "string", "source": "string (URL)" },
+      "market_cap": { "pkr": "number", "usd": "number", "fx_used": { "rate": "number", "date": "string", "source": "string (URL)" } },
       "key_metrics": {
-        "PE_TTM": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" },
-        "P_B": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" },
-        "ROE_TTM": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" },
-        "Revenue_TTM": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" },
-        "Net_Income_TTM": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" },
-        "Free_Cash_Flow": { "value": "number | null", "date": "string", "source": "string", "peer_median": "number", "percentile": "number" }
+        "PE_TTM": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string (e.g., 'Lower than peer median of X')" },
+        "P_B": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string" },
+        "ROE_TTM": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string" },
+        "Dividend_Yield_TTM": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string" },
+        "Revenue_TTM": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string" },
+        "Net_Income_TTM": { "value": "number | null", "date": "string", "source": "string (URL)", "peer_median": "number", "trend": "'up' | 'down' | 'flat'", "peer_comparison_text": "string" }
       },
-      "score": { "financial_health": "number", "profitability": "number", "growth": "number", "valuation": "number", "cash_flow": "number", "governance": "number", "overall_score": "number" },
-      "recommendation": { "action": "string", "confidence_pct": "number", "rationale_short": "string" },
-      "top_reasons_buy": ["string"],
-      "top_risks": ["string"],
-      "raw_sources": [{ "label": "string", "url": "string", "date": "string" }],
+      "score": { "financial_health": "number (0-100)", "profitability": "number (0-100)", "growth": "number (0-100)", "valuation": "number (0-100)", "cash_flow": "number (0-100)", "governance": "number (0-100)", "overall_score": "number (0-100)" },
+      "recommendation": { "action": "string (e.g., 'BUY')", "confidence_pct": "number (0-100)", "rationale_short": "string (1-2 sentences)", "confidence_rationale": "string (e.g., 'Confidence reduced due to X')" },
+      "top_reasons_buy": ["string (3-5 reasons)"],
+      "weighted_risks": [{ "description": "string", "impact": "'High' | 'Medium' | 'Low'" }],
+      "raw_sources": [{ "label": "string", "url": "string (URL)", "date": "string" }],
       "executive_summary": "string",
       "financial_health_details": "string",
       "profitability_details": "string",
       "growth_details": "string",
       "valuation_details": "string",
       "governance_details": "string",
-      "macro_industry_factors": "string"
+      "macro_industry_factors": "string",
+      "cash_flow_details": "string (Detailed breakdown of OCF and FCF with 3-year trend analysis)",
+      "historical_valuation_details": "string (Compare current valuation like P/E to its 5-year average)",
+      "forward_guidance_details": "string (Incorporate analyst estimates or forward guidance if available)",
+      "visual_data_summary": {
+        "profit_trend_comment": "string (Brief comment on 5-year profit trend)",
+        "roe_vs_peers_comment": "string (Brief comment on ROE vs peers)",
+        "dividend_history_comment": "string (Brief comment on dividend history and sustainability)"
+      },
+      "extra_sections": {
+          "esg_governance": "string (Comments on ESG or Shariah compliance)",
+          "stress_test": "string (Comment on potential performance in a bad-case macro scenario)",
+          "action_plan": "string (Suggested re-check cadence, e.g., 'Revisit after Q3 results')"
+      }
     }
-
     Do not add any text, notes, or explanations outside of the JSON markdown block.
     `;
 
